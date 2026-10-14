@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guía Paso a Paso: CameraX con Jetpack Compose</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: #24292e;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background-color: #ffffff;
+        }
+        h1 {
+            color: #0366d6;
+            border-bottom: 2px solid #e1e4e8;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #24292e;
+            border-bottom: 1px solid #e1e4e8;
+            padding-bottom: 6px;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #005cc5;
+        }
+        pre {
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            padding: 16px;
+            overflow: auto;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            font-size: 14px;
+            border: 1px solid #e1e4e8;
+        }
+        code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            background-color: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        .note {
+            background-color: #ddf4ff;
+            border-left: 4px solid #0969da;
+            padding: 12px 16px;
+            margin: 16px 0;
+            border-radius: 0 6px 6px 0;
+        }
+        .important {
+            background-color: #fff8c5;
+            border-left: 4px solid #d4a72c;
+            padding: 12px 16px;
+            margin: 16px 0;
+            border-radius: 0 6px 6px 0;
+        }
+        @media print {
+            body { max-width: 100%; padding: 0; }
+            pre { white-space: pre-wrap; word-wrap: break-word; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Guía Paso a Paso: Implementación de CameraX con Jetpack Compose</h1>
+
+    <div class="note">
+        <strong>Nota para el profesor:</strong> Esta guía está estructurada de forma didáctica para enseñar a tus alumnos cómo integrar la cámara usando Jetpack <strong>CameraX</strong> y <strong>Jetpack Compose</strong> en Android.
+    </div>
+
+    <h2>1. Introducción a CameraX</h2>
+    <p>CameraX es una biblioteca del paquete <strong>Android Jetpack</strong> que simplifica el desarrollo con la cámara. Sus principales características son:</p>
+    <ul>
+        <li><strong>Consistencia:</strong> Funciona de forma homogénea en la gran mayoría de dispositivos Android.</li>
+        <li><strong>Manejo del Ciclo de Vida:</strong> Se vincula automáticamente al <code>LifecycleOwner</code> de la pantalla.</li>
+        <li><strong>Casos de uso principales:</strong>
+            <ul>
+                <li><code>Preview</code>: Muestra en tiempo real lo que enfoca la cámara.</li>
+                <li><code>ImageCapture</code>: Captura fotos en alta calidad.</li>
+                <li><code>VideoCapture</code>: Graba vídeos.</li>
+            </ul>
+        </li>
+    </ul>
+
+    <h2>Paso 1: Agregar Dependencias en <code>build.gradle.kts</code></h2>
+    <p>Abre el archivo <code>app/build.gradle.kts</code> y añade las dependencias de <strong>CameraX</strong> y la librería de permisos <strong>Accompanist</strong>:</p>
+
+<pre><code>dependencies {
+    // CameraX v1.6.2 (Compatible con alineación de memoria de 16 KB)
+    val cameraxVersion = "1.6.2"
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // Accompanist para gestionar permisos en Compose
+    implementation("com.google.accompanist:accompanist-permissions:0.37.3")
+}</code></pre>
+
+    <div class="important">
+        <strong>¡Importante!</strong> Recuerda pulsar el botón <strong>Sync Now</strong> en Android Studio tras modificar Gradle.
+    </div>
+
+    <h2>Paso 2: Declarar Permisos en <code>AndroidManifest.xml</code></h2>
+    <p>Abre <code>app/src/main/AndroidManifest.xml</code> y añade los permisos antes de la etiqueta <code>&lt;application&gt;</code>:</p>
+
+<pre><code>&lt;manifest xmlns:android="http://schemas.android.com/apk/res/android"&gt;
+
+    &lt;!-- Indica que la app usará la cámara --&gt;
+    &lt;uses-feature android:name="android.hardware.camera.any" /&gt;
+
+    &lt;!-- Permisos requeridos --&gt;
+    &lt;uses-permission android:name="android.permission.CAMERA" /&gt;
+    &lt;uses-permission android:name="android.permission.RECORD_AUDIO" /&gt;
+    &lt;uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" /&gt;
+
+    &lt;application ...&gt;
+        ...
+    &lt;/application&gt;
+&lt;/manifest&gt;</code></pre>
+
+    <h2>Paso 3: Solicitar Permisos en Tiempo de Ejecución</h2>
+    <p>En Android es obligatorio pedir la autorización interactiva al usuario en pantalla:</p>
+
+<pre><code>@OptIn(ExperimentalPermissionsApi::class)
+@Composable
+fun ComposableCameraScreen() {
+    val cameraPermissionState = rememberPermissionState(android.Manifest.permission.CAMERA)
+
+    LaunchedEffect(Unit) {
+        if (!cameraPermissionState.status.isGranted) {
+            cameraPermissionState.launchPermissionRequest()
+        }
+    }
+
+    if (cameraPermissionState.status.isGranted) {
+        CameraPreviewContent()
+    } else {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Se requiere permiso de cámara para continuar.")
+        }
+    }
+}</code></pre>
+
+    <h2>Paso 4: Crear la Vista Previa de la Cámara (Preview)</h2>
+    <p>Integramos la vista nativa <code>PreviewView</code> en Compose mediante <code>AndroidView</code>:</p>
+
+<pre><code>@Composable
+fun CameraPreviewContent() {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    val imageCapture = remember { ImageCapture.Builder().build() }
+    val previewView = remember { PreviewView(context) }
+
+    LaunchedEffect(Unit) {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+        cameraProviderFuture.addListener({
+            val cameraProvider = cameraProviderFuture.get()
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(previewView.surfaceProvider)
+            }
+
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+            try {
+                cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    cameraSelector,
+                    preview,
+                    imageCapture
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }, ContextCompat.getMainExecutor(context))
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { previewView },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Button(
+            onClick = { takePhotoAndSaveLocal(context, imageCapture) },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(32.dp)
+        ) {
+            Text("Tomar y Guardar Foto")
+        }
+    }
+}</code></pre>
+
+    <h2>Paso 5: Tomar y Guardar la Foto en la Galería (<code>MediaStore</code>)</h2>
+
+<pre><code>private fun takePhotoAndSaveLocal(
+    context: Context,
+    imageCapture: ImageCapture
+) {
+    val name = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+        .format(System.currentTimeMillis())
+
+    val contentValues = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, "IMG_$name.jpg")
+        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MiAppCompose")
+    }
+
+    val outputOptions = ImageCapture.OutputFileOptions.Builder(
+        context.contentResolver,
+        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+        contentValues
+    ).build()
+
+    imageCapture.takePicture(
+        outputOptions,
+        ContextCompat.getMainExecutor(context),
+        object : ImageCapture.OnImageSavedCallback {
+            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                val savedUri = outputFileResults.savedUri
+                Toast.makeText(context, "Foto guardada localmente en: $savedUri", Toast.LENGTH_LONG).show()
+            }
+
+            override fun onError(exception: ImageCaptureException) {
+                Toast.makeText(context, "Error al guardar la foto: ${exception.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    )
+}</code></pre>
+
+    <h2>6. Código Fuente Completo (<code>MainActivity.kt</code>)</h2>
+
+<pre><code>package com.example.kamara
+
+import android.content.ContentValues
+import android.content.Context
+import android.os.Bundle
+import android.provider.MediaStore
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.kamara.ui.theme.KamaraTheme
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
+import java.text.SimpleDateFormat
+import java.util.Locale
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            KamaraTheme {
+                ComposableCameraScreen()
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalPermissionsApi::class)
+@Composable
+fun ComposableCameraScreen() {
+    val cameraPermissionState = rememberPermissionState(android.Manifest.permission.CAMERA)
+
+    LaunchedEffect(Unit) {
+        if (!cameraPermissionState.status.isGranted) {
+            cameraPermissionState.launchPermissionRequest()
+        }
+    }
+
+    if (cameraPermissionState.status.isGranted) {
+        CameraPreviewContent()
+    } else {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Se requiere permiso de cámara para continuar.")
+        }
+    }
+}
+
+@Composable
+fun CameraPreviewContent() {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    val imageCapture = remember { ImageCapture.Builder().build() }
+    val previewView = remember { PreviewView(context) }
+
+    LaunchedEffect(Unit) {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+        cameraProviderFuture.addListener({
+            val cameraProvider = cameraProviderFuture.get()
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(previewView.surfaceProvider)
+            }
+
+            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+
+            try {
+                cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    cameraSelector,
+                    preview,
+                    imageCapture
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }, ContextCompat.getMainExecutor(context))
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { previewView },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        Button(
+            onClick = { takePhotoAndSaveLocal(context, imageCapture) },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(32.dp)
+        ) {
+            Text("Tomar y Guardar Foto")
+        }
+    }
+}
+
+private fun takePhotoAndSaveLocal(
+    context: Context,
+    imageCapture: ImageCapture
+) {
+    val name = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+        .format(System.currentTimeMillis())
+
+    val contentValues = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, "IMG_$name.jpg")
+        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MiAppCompose")
+    }
+
+    val outputOptions = ImageCapture.OutputFileOptions.Builder(
+        context.contentResolver,
+        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+        contentValues
+    ).build()
+
+    imageCapture.takePicture(
+        outputOptions,
+        ContextCompat.getMainExecutor(context),
+        object : ImageCapture.OnImageSavedCallback {
+            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                val savedUri = outputFileResults.savedUri
+                Toast.makeText(
+                    context,
+                    "Foto guardada localmente en: $savedUri",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+
+            override fun onError(exception: ImageCaptureException) {
+                Toast.makeText(
+                    context,
+                    "Error al guardar la foto: ${exception.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    )
+}</code></pre>
+
+</body>
+</html>
