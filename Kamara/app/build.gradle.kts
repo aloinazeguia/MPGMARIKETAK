@@ -49,14 +49,15 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation("androidx.constraintlayout:constraintlayout:2.2.2")
-    //Kamara
-    val cameraVersion = "1.6.2" // Use 'val' in Kotlin DSL
-    implementation("androidx.camera:camera-core:${cameraVersion}")
-    implementation("androidx.camera:camera-camera2:${cameraVersion}")
-    implementation("androidx.camera:camera-lifecycle:${cameraVersion}")
-    implementation("androidx.camera:camera-video:${cameraVersion}")
-    implementation("androidx.camera:camera-view:${cameraVersion}")
-    implementation("androidx.camera:camera-extensions:${cameraVersion}")
+    // CameraX
+    val cameraxVersion = "1.6.2"
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // Accompanist para gestionar permisos en Compose
+    implementation("com.google.accompanist:accompanist-permissions:0.37.3")
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
