@@ -12,15 +12,27 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -50,10 +62,6 @@ class MainActivity : ComponentActivity() {
 }
 
 // 2. PANTALLA PRINCIPAL CON GESTIÓN DE PERMISOS DE CÁMARA
-/*
- @OptIn(ExperimentalPermissionsApi::class): Es un permiso para el compilador de Kotlin.
- Permite usar la API de permisos de Accompanist (aún marcada como experimental por Google).
-*/
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun ComposableCameraScreen() {
@@ -62,7 +70,7 @@ fun ComposableCameraScreen() {
 
     // LaunchedEffect se ejecuta automáticamente al iniciar este componente
     LaunchedEffect(Unit) {
-        // Si el usuario aún no ha concedido el permiso, se lo solicitamos interactiva mente
+        // Si el usuario aún no ha concedido el permiso, se lo solicitamos interactivamente
         if (!cameraPermissionState.status.isGranted) {
             cameraPermissionState.launchPermissionRequest()
         }
@@ -70,7 +78,7 @@ fun ComposableCameraScreen() {
 
     // Comprobamos si el permiso ha sido concedido
     if (cameraPermissionState.status.isGranted) {
-        // Si hay permiso: mostramos el visor de la cámara y el botón
+        // Si hay permiso: mostramos el visor de la cámara y los botones
         CameraPreviewContent()
     } else {
         // Si el usuario rechazó el permiso: mostramos un mensaje explicativo
@@ -80,13 +88,15 @@ fun ComposableCameraScreen() {
     }
 }
 
-// 3. COMPONENTE DE VISTA PREVIA Y BOTÓN DE CAPTURA DE CÁMARA
-
+// 3. COMPONENTE DE VISTA PREVIA, OBTURADOR E INVERSIÓN DE CÁMARA
 @Composable
 fun CameraPreviewContent() {
     // Obtenemos el contexto actual de Android y el ciclo de vida de la pantalla
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Estado para alternar entre la cámara trasera y la cámara frontal
+    var cameraSelector by remember { mutableStateOf(CameraSelector.DEFAULT_BACK_CAMERA) }
 
     // Caso de uso 1: ImageCapture (para tomar fotos en alta resolución)
     val imageCapture = remember { ImageCapture.Builder().build() }
@@ -94,8 +104,8 @@ fun CameraPreviewContent() {
     // Vista nativa de Android (PreviewView) que renderiza la imagen en tiempo real
     val previewView = remember { PreviewView(context) }
 
-    // Configuramos y vinculamos CameraX cuando se crea la pantalla
-    LaunchedEffect(Unit) {
+    // Reconfiguramos CameraX automáticamente cada vez que cambie cameraSelector
+    LaunchedEffect(cameraSelector) {
         val cameraProviderFuture = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
             // Obtenemos el proveedor de la cámara
@@ -106,14 +116,11 @@ fun CameraPreviewContent() {
                 it.setSurfaceProvider(previewView.surfaceProvider)
             }
 
-            // Seleccionamos la cámara trasera por defecto (DEFAULT_FRONT_CAMERA para la frontal)
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-
             try {
                 // Desvinculamos cualquier uso previo antes de volver a vincular
                 cameraProvider.unbindAll()
 
-                // Vinculamos la cámara al ciclo de vida de la Activity (se apaga/enciende automáticamente)
+                // Vinculamos la cámara activa al ciclo de vida de la Activity
                 cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     cameraSelector,
@@ -126,22 +133,48 @@ fun CameraPreviewContent() {
         }, ContextCompat.getMainExecutor(context))
     }
 
-    // Diseño de la pantalla: Vista previa de cámara + Botón superpuesto en la parte inferior
+    // Diseño de la pantalla: Vista previa de cámara + Botón obturador + Botón de invertir cámara
     Box(modifier = Modifier.fillMaxSize()) {
-        // Integramos la vista nativa de Android (PreviewView) dentro de Compose
+        // Vista previa de la cámara a pantalla completa
         AndroidView(
             factory = { previewView },
             modifier = Modifier.fillMaxSize()
         )
 
-        // Botón para tomar la fotografía
+        // Botón obturador (redondo en el centro inferior)
         Button(
             onClick = { takePhotoAndSaveLocal(context, imageCapture) },
+            shape = CircleShape,
+            contentPadding = PaddingValues(0.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(32.dp)
+                .size(70.dp)
         ) {
-            Text("Tomar y Guardar Foto")
+            // Botón limpio sin texto
+        }
+
+        // Botón abajo a la derecha para conmutar la cámara (trasera / frontal)
+        IconButton(
+            onClick = {
+                cameraSelector = if (cameraSelector == CameraSelector.DEFAULT_BACK_CAMERA) {
+                    CameraSelector.DEFAULT_FRONT_CAMERA
+                } else {
+                    CameraSelector.DEFAULT_BACK_CAMERA
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(32.dp)
+                .size(56.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = "Invertir cámara",
+                tint = Color.White,
+                modifier = Modifier.size(36.dp)
+            )
         }
     }
 }
