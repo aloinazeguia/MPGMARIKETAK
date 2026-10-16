@@ -1,8 +1,10 @@
 package com.example.kamara
 
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.location.Location
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -47,7 +49,8 @@ import coil.compose.AsyncImage
 import com.example.kamara.ui.theme.KamaraTheme
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.google.android.gms.location.LocationServices
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -65,15 +68,27 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun ComposableCameraScreen() {
-    val cameraPermissionState = rememberPermissionState(android.Manifest.permission.CAMERA)
+    // Solicitamos tanto el permiso de cámara como los permisos de ubicación GPS
+    val permissionsState = rememberMultiplePermissionsState(
+        listOf(
+            android.Manifest.permission.CAMERA,
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+    )
 
     LaunchedEffect(Unit) {
-        if (!cameraPermissionState.status.isGranted) {
-            cameraPermissionState.launchPermissionRequest()
+        if (!permissionsState.allPermissionsGranted) {
+            permissionsState.launchMultiplePermissionRequest()
         }
     }
 
-    if (cameraPermissionState.status.isGranted) {
+    // Comprobamos si el permiso de la cámara está concedido
+    val cameraGranted = permissionsState.permissions.find {
+        it.permission == android.Manifest.permission.CAMERA
+    }?.status?.isGranted ?: false
+
+    if (cameraGranted) {
         CameraPreviewContent()
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -82,6 +97,7 @@ fun ComposableCameraScreen() {
     }
 }
 
+@SuppressLint("MissingPermission")
 @Composable
 fun CameraPreviewContent() {
     val context = LocalContext.current
@@ -156,8 +172,23 @@ fun CameraPreviewContent() {
         // 3. Botón obturador (Centro abajo, redondo y sin texto)
         Button(
             onClick = {
-                takePhotoAndSaveLocal(context, imageCapture) { newUri ->
-                    lastPhotoUri = newUri // Actualiza la miniatura al tomar la foto
+                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                try {
+                    fusedLocationClient.lastLocation
+                        .addOnSuccessListener { location: Location? ->
+                            takePhotoAndSaveLocal(context, imageCapture, location) { newUri ->
+                                lastPhotoUri = newUri
+                            }
+                        }
+                        .addOnFailureListener {
+                            takePhotoAndSaveLocal(context, imageCapture, null) { newUri ->
+                                lastPhotoUri = newUri
+                            }
+                        }
+                } catch (e: Exception) {
+                    takePhotoAndSaveLocal(context, imageCapture, null) { newUri ->
+                        lastPhotoUri = newUri
+                    }
                 }
             },
             shape = CircleShape,
@@ -198,8 +229,14 @@ fun CameraPreviewContent() {
 private fun takePhotoAndSaveLocal(
     context: Context,
     imageCapture: ImageCapture,
+    location: Location?,
     onPhotoCaptured: (Uri?) -> Unit
 ) {
+    // 1. Crear los metadatos de la imagen con la posición GPS recibida
+    val photoMetadata = ImageCapture.Metadata().apply {
+        this.location = location
+    }
+
     val name = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
         .format(System.currentTimeMillis())
 
@@ -213,7 +250,9 @@ private fun takePhotoAndSaveLocal(
         context.contentResolver,
         MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
         contentValues
-    ).build()
+    )
+        .setMetadata(photoMetadata)
+        .build()
 
     imageCapture.takePicture(
         outputOptions,
@@ -221,7 +260,7 @@ private fun takePhotoAndSaveLocal(
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                 val savedUri = outputFileResults.savedUri
-                onPhotoCaptured(savedUri) // Notifica la nueva URI a Compose
+                onPhotoCaptured(savedUri)
                 Toast.makeText(
                     context,
                     "Foto guardada localmente",
