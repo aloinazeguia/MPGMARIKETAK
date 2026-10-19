@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.view.PreviewView
@@ -44,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.example.kamara.ui.theme.KamaraTheme
@@ -99,7 +101,7 @@ fun ComposableCameraScreen() {
 
 @SuppressLint("MissingPermission")
 @Composable
-fun CameraPreviewContent() {
+fun CameraPreviewContent()  {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -117,9 +119,23 @@ fun CameraPreviewContent() {
         val cameraProviderFuture = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
+            //vista previa
             val preview = androidx.camera.core.Preview.Builder().build().also {
                 it.setSurfaceProvider(previewView.surfaceProvider)
             }
+
+            // B) Analizador de códigos QR
+            val imageAnalysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+                .also { analysis ->
+                    analysis.setAnalyzer(
+                        ContextCompat.getMainExecutor(context),
+                        QrCodeAnalyzer { qrTexto ->
+                            Toast.makeText(context, "QR detectado: $qrTexto", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
 
             try {
                 cameraProvider.unbindAll()
@@ -127,13 +143,17 @@ fun CameraPreviewContent() {
                     lifecycleOwner,
                     cameraSelector,
                     preview,
-                    imageCapture
+                    imageCapture,
+                    //se añade el analizador QR
+                    imageAnalysis
                 )
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }, ContextCompat.getMainExecutor(context))
     }
+
+
 
     Box(modifier = Modifier.fillMaxSize()) {
         // 1. Vista previa de la cámara
