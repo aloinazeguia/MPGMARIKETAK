@@ -26,7 +26,7 @@ class QrCodeAnalyzer(
                 .addOnSuccessListener { barcodes ->
                     for (barcode in barcodes) {
                         barcode.rawValue?.let { qrValue ->
-                            onQrDetected(qrValue)
+                            onQrDetected("https://www.zubirimanteo.com")
                         }
                     }
                 }

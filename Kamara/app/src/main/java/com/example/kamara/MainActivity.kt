@@ -111,6 +111,9 @@ fun CameraPreviewContent()  {
     // Estado para guardar la Uri de la última foto tomada
     var lastPhotoUri by remember { mutableStateOf<Uri?>(null) }
 
+    // Estado para evitar que abra la web cientos de veces seguidas por cada fotograma
+    var lastScannedUrl by remember { mutableStateOf("") }
+
     val imageCapture = remember { ImageCapture.Builder().build() }
     val previewView = remember { PreviewView(context) }
 
@@ -124,7 +127,7 @@ fun CameraPreviewContent()  {
                 it.setSurfaceProvider(previewView.surfaceProvider)
             }
 
-            // B) Analizador de códigos QR
+// Configuración del analizador QR
             val imageAnalysis = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
@@ -132,7 +135,18 @@ fun CameraPreviewContent()  {
                     analysis.setAnalyzer(
                         ContextCompat.getMainExecutor(context),
                         QrCodeAnalyzer { qrTexto ->
-                            Toast.makeText(context, "QR detectado: $qrTexto", Toast.LENGTH_SHORT).show()
+                            // 1. Comprobamos si el texto leído es una URL válida (empieza por http:// o https://)
+                            if ((qrTexto.startsWith("http://") || qrTexto.startsWith("https://")) && qrTexto != lastScannedUrl) {
+                                lastScannedUrl = qrTexto // Guardamos la URL para no reabrirla inmediatamente
+
+                                try {
+                                    // 2. Creamos la intención de abrir el navegador
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(qrTexto))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "No se pudo abrir la URL: $qrTexto", Toast.LENGTH_SHORT).show()
+                                }
+                            }
                         }
                     )
                 }
