@@ -1,15 +1,48 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# ==============================================================================
+# ARCHIVOS IGNORADOS PARA PROYECTOS ANDROID (Windows / macOS)
+# ==============================================================================
+
+# 1. Archivos de configuración local (CRÍTICO para compatibilidad Windows/Mac)
+# Contiene la ruta del SDK de Android, que cambia entre C:\Users\... y /Users/...
 local.properties
+
+# 2. Caché y archivos generados por Gradle
+.gradle/
+build/
+/build
+/app/build/
+/captures
+.externalNativeBuild/
+.cxx/
+
+# 3. Archivos de la IDE (Android Studio / IntelliJ)
+# Se ignoran para evitar conflictos de rutas y pestañas abiertas entre SO
+.idea/
+*.iml
+
+# 4. Archivos ejecutables y empaquetados generados
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+
+# 5. Archivos del sistema operativo
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs.dc
+Desktop.ini
+$RECYCLE.BIN/
+
+# 6. Claves de firma y registros (Logs)
+*.jks
+*.keystore
+*.log
